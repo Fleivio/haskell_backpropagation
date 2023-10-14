@@ -1,9 +1,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
 module Network(Network(..), forward, forwardLog) where
-
 import Layer
-
 
 data Network = Network {
     layers :: [Layer]
@@ -21,8 +19,3 @@ forwardLog :: Network -> Vec -> [(Vec, Vec)]
 forwardLog net input = case layers net of
     [] -> [(input, input)]
     (l:ls) -> (input, calcS l input) : forwardLog net {layers = ls} (evaluate l input)
-
--- backprop :: Network -> Vec -> Vec -> Network
--- backprop net input target = case layers net of
---     [] -> net
---     (l:ls) -> backprop net {layers = ls} input target
