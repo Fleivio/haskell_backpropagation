@@ -25,7 +25,10 @@ source-repository head
 
 library
   exposed-modules:
+      Layer
       Lib
+      Network
+      Utils
   other-modules:
       Paths_backpropagation
   autogen-modules:

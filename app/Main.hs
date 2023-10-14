@@ -1,6 +1,7 @@
 module Main (main) where
+import qualified Numeric.LinearAlgebra as N
 
-import Lib
+import Layer
 
 main :: IO ()
-main = someFunc
+main = print $ evaluate testLayer (N.vector [1,2]) 
