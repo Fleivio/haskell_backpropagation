@@ -9,8 +9,10 @@ import Network ( forward, Network(Network), forwardLog )
 mkMyNet :: IO Network
 mkMyNet = do
     l1 <- mkLayer sigmoid 2 3
-    l2 <- mkLayer sigmoid 3 2  
-    return $ Network [l1, l2]
+    l2 <- mkLayer sigmoid 3 5
+    l3 <- mkLayer sigmoid 5 3
+    l4 <- mkLayer softmax 3 3
+    return $ Network [l1, l2, l3, l4]
 
 main :: IO ()
 main = do

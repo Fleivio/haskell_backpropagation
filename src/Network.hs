@@ -5,7 +5,7 @@ import Layer
 
 data Network = Network {
     layers :: [Layer]
-    } deriving (Show, Eq)
+    } deriving (Show)
 
 forward :: Network -> Vec -> Vec
 forward net input = case layers net of
