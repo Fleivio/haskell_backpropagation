@@ -1,19 +1,25 @@
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Use <&>" #-}
-module Layer(Layer(..), Vec, evaluate, calcS, calcZ, mkLayer, calcDfZ, backpropLayer) where
-import qualified Numeric.LinearAlgebra as N
+module Layer (Layer (..), LayerTrainPack (..), Vec, Delta, evaluate, calcS, calcZ, mkLayer, calcDfZ, backpropLayer, backpropLastLayer) where
+
 import Functions
+import  qualified Numeric.LinearAlgebra as N
 
 type Vec = N.Vector Double
 
-data Layer = Layer {
-    activation :: Activation,
+type Delta = Vec
+
+data Layer = Layer
+  { activation :: Activation,
     weights :: N.Matrix Double,
     bias :: Vec
-}
+  }
 
 instance Show Layer where
-    show (Layer _ w b) = "Layer " ++ show w ++ " " ++ show b
+  show (Layer _ w _) =
+    "\nInput: "
+      ++ show (N.cols w)
+      ++ "\nOutput "
+      ++ show (N.rows w)
+      ++ "\n"
 
 evaluate :: Layer -> Vec -> Vec
 evaluate l = calcZ l . calcS l
@@ -27,25 +33,45 @@ calcZ (Layer f1 _ _) = N.fromList . f f1 . N.toList
 calcDfZ :: Layer -> Vec -> Vec
 calcDfZ (Layer f1 _ _) = N.fromList . df f1 . N.toList
 
-calcDelta :: Layer -> Layer -> Vec -> Vec -> Vec
-calcDelta layer nextLayer nextDelta z = (wt N.#> nextDelta) * dfz
-    where
-        wt = N.tr $ weights nextLayer
-        dfz = calcDfZ layer z
+calcDelta :: Layer -> Layer -> Delta -> Vec -> Delta
+calcDelta layer nxtLayer nxtDelta actZ = (wt N.#> nxtDelta) * dfz
+  where
+    wt = N.tr $ weights nxtLayer
+    dfz = calcDfZ layer actZ
 
-backpropLayer :: Layer -> Layer -> Vec -> Vec -> Vec -> Double -> Layer
-backpropLayer layer nextLayer nextDelta z prevZ rate
-    = layer {
-        weights = weights layer - N.scale rate wDeriv,
-        bias    = bias layer    - N.scale rate bDeriv
+data LayerTrainPack = LayerTrainPack
+  { nextLayer :: Layer,
+    nextDelta :: Delta,
+    z :: Vec,
+    prevZ :: Vec
+  }
+  deriving (Show)
+
+backpropLayer :: Layer -> LayerTrainPack -> Double -> (Layer, Delta)
+backpropLayer layer (LayerTrainPack nxtLayer nxtDelta actZ prvZ) rate =
+  ( layer
+      { weights = weights layer - N.scale rate wDeriv,
+        bias = bias layer - N.scale rate bDeriv
+      },
+    delta
+  )
+  where
+    wDeriv = delta `N.outer` prvZ
+    bDeriv = delta
+    delta = calcDelta layer nxtLayer nxtDelta actZ
+
+backpropLastLayer :: Layer -> Delta -> Vec -> Double -> Layer
+backpropLastLayer layer delta prvZ rate =
+  layer
+    { weights = weights layer - N.scale rate wDeriv,
+      bias = bias layer - N.scale rate bDeriv
     }
-    where
-        wDeriv = delta `N.outer` prevZ
-        bDeriv = delta
-        delta = calcDelta layer nextLayer nextDelta z
+  where
+    wDeriv = delta `N.outer` prvZ
+    bDeriv = delta
 
 mkLayer :: Activation -> Int -> Int -> IO Layer
 mkLayer f1 l c = do
-    w <- N.rand l c
-    b <- N.rand l 1 >>= return . head . N.toColumns
-    return $ Layer f1 w b
+  w <- N.rand l c
+  b <- N.rand l 1 >>= return . head . N.toColumns
+  return $ Layer f1 w b

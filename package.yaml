@@ -36,6 +36,8 @@ ghc-options:
 
 library:
   source-dirs: src
+  ghc-options: 
+    - -fno-warn-tabs
 
 executables:
   backpropagation-exe:
