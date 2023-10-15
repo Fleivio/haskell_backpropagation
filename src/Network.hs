@@ -1,7 +1,9 @@
-module Network (Network (..), forward, forwardLog, backprop) where
+module Network (Network (..), forward, forwardLog, backprop, train, test, testShow) where
 
 import GHC.OldList (zip4)
 import Layer
+import Functions
+import qualified Numeric.LinearAlgebra as N
 
 data Network = Network
   { layers :: [Layer],
@@ -24,6 +26,24 @@ forwardLog net input =
     [] -> [input]
     (l : ls) -> input : forwardLog net {layers = ls} (evaluate l input)
 
+train :: Network -> [(Vec, Vec)] -> Network
+train net [] = net
+train net ((input, target) : xs) = train (backprop net input target) xs
+
+test :: Network -> ErrorFunction -> [(Vec, Vec)] -> Double
+test net errF datas = sum $ map error1 datas
+  where
+    error1 (input, target) 
+      = let output = forward net input
+        in errF (N.toList target) (N.toList output)
+
+testShow :: Network -> ErrorFunction -> [(Vec, Vec)] -> IO ()
+testShow net errF datas = do
+  let error1 (input, target) 
+        = let output = forward net input
+          in errF (N.toList target) (N.toList output)
+  mapM_ (putStrLn . show . error1) datas
+
 backprop :: Network -> Vec -> Vec -> Network
 backprop net input target =
   net
@@ -39,7 +59,7 @@ backprop net input target =
         (init forwardLog') -- prevZ
         (layers net) -- layer
         (tail $ layers net) -- nextLayer
-    errorOut = target - output
+    errorOut = output - target
     deltaOut = errorOut * (calcDfZ $ last $ layers net) output
 
     layerOut =

@@ -1,9 +1,11 @@
-module Functions (Activation (..), sigmoid, softmax, id_, crossEntropy, squaredMeanError) where
+module Functions (Activation (..), ErrorFunction ,sigmoid, softmax, id_, crossEntropy, squaredMeanError) where
 
 data Activation = Act
   { f :: [Double] -> [Double],
     df :: [Double] -> [Double]
   }
+
+type ErrorFunction = [Double] -> [Double] -> Double
 
 sigmoid :: Activation
 sigmoid =
@@ -26,8 +28,8 @@ id_ =
       df = id
     }
 
-crossEntropy :: [Double] -> [Double] -> Double
+crossEntropy :: ErrorFunction
 crossEntropy ys yhs = negate $ sum $ zipWith (*) yhs $ fmap log ys
 
-squaredMeanError :: [Double] -> [Double] -> Double
+squaredMeanError :: ErrorFunction
 squaredMeanError ys yhs = sum $ zipWith (\y yh -> (y - yh) ** 2) ys yhs
