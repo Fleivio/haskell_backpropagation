@@ -4,6 +4,7 @@ import GHC.OldList (zip4)
 import Layer
 import Functions
 import qualified Numeric.LinearAlgebra as N
+import Debug.Trace (trace)
 
 data Network = Network
   { layers :: [Layer],
@@ -13,6 +14,9 @@ data Network = Network
 
 instance Show Network where
   show net = show (layers net)
+
+calcErr :: Network -> Vec -> Vec -> Double
+calcErr net output target = errF net (N.toList output) (N.toList target)
 
 forward :: Network -> Vec -> Vec
 forward net input =
@@ -34,13 +38,13 @@ test net datas = sum (map error1 datas) / fromIntegral (length datas)
   where
     error1 (input, target) 
       = let output = forward net input
-        in errF net (N.toList target) (N.toList output)
+        in calcErr net output target
 
 testShow :: Network -> [(Vec, Vec)] -> IO ()
 testShow net datas = do
   let error1 (input, target) 
         = let output = forward net input
-          in errF net (N.toList target) (N.toList output)
+          in calcErr net output target
   mapM_ (putStrLn . show . error1) datas
 
 train :: Network -> [(Vec, Vec)] -> Network
@@ -74,7 +78,8 @@ backprop net input target =
 
     backprop' :: [(Vec, Vec, Layer, Layer)] -> Delta -> [Layer]
     backprop' [] _ = []
-    backprop' ltps nxtDelta = backprop' (init ltps) delta ++ [al]
+    backprop' ltps nxtDelta = --trace (show nxtDelta ++ show delta ++ "\n") $ 
+      backprop' (init ltps) delta ++ [al]
       where
         (actZ, pz, l, nl) = last ltps
         tp = LayerTrainPack nl nxtDelta actZ pz

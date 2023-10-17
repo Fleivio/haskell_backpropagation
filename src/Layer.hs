@@ -2,6 +2,7 @@ module Layer (Layer (..), LayerTrainPack (..), Vec, Delta, evaluate, calcS, calc
 
 import Functions
 import  qualified Numeric.LinearAlgebra as N
+import Debug.Trace
 
 type Vec = N.Vector Double
 
@@ -48,7 +49,8 @@ data LayerTrainPack = LayerTrainPack
   deriving (Show)
 
 backpropLayer :: Layer -> LayerTrainPack -> Double -> (Layer, Delta)
-backpropLayer layer (LayerTrainPack nxtLayer nxtDelta actZ prvZ) rate =
+backpropLayer layer a@(LayerTrainPack nxtLayer nxtDelta actZ prvZ) rate =
+  -- trace (show a)
   ( layer
       { weights = weights layer - N.scale rate wDeriv,
         bias = bias layer - N.scale rate bDeriv
@@ -79,5 +81,5 @@ mkLayer f1 l c = do
 mkPrefLayer :: Activation -> Int -> Int -> Layer
 mkPrefLayer f1 l c = Layer f1 w b
   where
-    w = N.matrix l (replicate (l * c) 0) :: N.Matrix Double
-    b = N.vector (replicate l 0)
+    w = N.matrix l (replicate (l * c) 1) :: N.Matrix Double
+    b = N.vector (replicate l 1)
