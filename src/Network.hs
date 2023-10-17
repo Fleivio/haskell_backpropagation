@@ -7,9 +7,12 @@ import qualified Numeric.LinearAlgebra as N
 
 data Network = Network
   { layers :: [Layer],
-    learningRate :: Double
+    learningRate :: Double,
+    errF :: ErrorFunction
   }
-  deriving (Show)
+
+instance Show Network where
+  show net = show (layers net)
 
 forward :: Network -> Vec -> Vec
 forward net input =
@@ -26,23 +29,23 @@ forwardLog net input =
     [] -> [input]
     (l : ls) -> input : forwardLog net {layers = ls} (evaluate l input)
 
-train :: Network -> [(Vec, Vec)] -> Network
-train net [] = net
-train net ((input, target) : xs) = train (backprop net input target) xs
-
-test :: Network -> ErrorFunction -> [(Vec, Vec)] -> Double
-test net errF datas = sum $ map error1 datas
+test :: Network -> [(Vec, Vec)] -> Double
+test net datas = sum (map error1 datas) / fromIntegral (length datas)
   where
     error1 (input, target) 
       = let output = forward net input
-        in errF (N.toList target) (N.toList output)
+        in errF net (N.toList target) (N.toList output)
 
-testShow :: Network -> ErrorFunction -> [(Vec, Vec)] -> IO ()
-testShow net errF datas = do
+testShow :: Network -> [(Vec, Vec)] -> IO ()
+testShow net datas = do
   let error1 (input, target) 
         = let output = forward net input
-          in errF (N.toList target) (N.toList output)
+          in errF net (N.toList target) (N.toList output)
   mapM_ (putStrLn . show . error1) datas
+
+train :: Network -> [(Vec, Vec)] -> Network
+train net [] = net
+train net ((input, target) : xs) = train (backprop net input target) xs
 
 backprop :: Network -> Vec -> Vec -> Network
 backprop net input target =

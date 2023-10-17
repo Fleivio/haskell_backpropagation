@@ -4,59 +4,44 @@ import qualified Numeric.LinearAlgebra as N
 import Layer
 import Functions
 import Network
-import DataGenerator
+import CsvReader
+import System.Random
+import System.Random.Shuffle
 
-mkMyNet :: IO Network
-mkMyNet = do
-    l1 <- mkLayer sigmoid 4 2
-    l2 <- mkLayer sigmoid 2 4
-    l3 <- mkLayer sigmoid 4 2
-    l4 <- mkLayer sigmoid 2 4
-    l5 <- mkLayer sigmoid 2 2
-    return $ Network [l1, l2, l3, l4, l5] 0.01
-
-singleTrain :: IO ()
-singleTrain = do
-    let 
-        input = N.vector [1, 2]
-        target = N.vector [2, 4]
-    myNet <- mkMyNet
-
-    let 
-        error1 = test myNet squaredMeanError [(input, target)]
-    putStrLn $ "Error: " ++ show error1
-
-    let
-        trainedNet = backprop myNet input target
-    
-    let 
-        error2 = test trainedNet squaredMeanError [(input, target)]
-    putStrLn $ "Error: " ++ show error2
-
-
+irisNet :: IO Network
+irisNet = do
+    l1 <- mkLayer sigmoid 5 4
+    l2 <- mkLayer softmax 3 5
+    l3 <- mkLayer softmax 3 3
+    return $ Network [l1, l2, l3] 0.1 squaredMeanError 
 
 main :: IO ()
 main = do
+    datas <- readCSV "Iris.csv"
+    n2 <- irisNet
+    gen <- newStdGen
     let 
-        size = 50000
+        datas' = map tail datas
+        labels = map last datas
+        
+        inputs = (map ( map read . init) datas') :: [[Double]]
+        targets = map (\x -> map (tobin . (==x)) tlab) labels
+            where 
+                tobin b = if b then 1 else 0
+                tlab = ["Iris-setosa", "Iris-versicolor", "Iris-virginica"]
+        
+        fullData = zip inputs targets
+         
+        shufData = shuffle' fullData (length fullData) gen
+        trainData = map (\(x,y) -> (N.vector x, N.vector y)) $ take 140 shufData
+        testData = map (\(x,y) -> (N.vector x, N.vector y)) $ drop 100 shufData
+
+        err1 = test n2 testData
     
-    datas <- genData 2 size
-    myNet <- mkMyNet
-    
+    putStrLn $ "Erro1 : " ++ show err1
+
     let
-        training = take 40000 datas
-        testing = drop 10000 datas
+        trained = train n2 trainData
+        err2 = test trained testData
 
-    let 
-        error1 = test myNet squaredMeanError testing
-    putStrLn $ "Error: " ++ show error1
-
-
-    putStrLn "Training..."
-    let
-        trainedNet = train myNet training
-
-    putStrLn "Testing..."
-    let
-        error2 = test trainedNet squaredMeanError testing
-    putStrLn $ "Error: " ++ show error2
+    putStrLn $ "Erro1 : " ++ show err2

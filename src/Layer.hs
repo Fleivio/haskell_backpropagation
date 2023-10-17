@@ -1,4 +1,4 @@
-module Layer (Layer (..), LayerTrainPack (..), Vec, Delta, evaluate, calcS, calcZ, mkLayer, calcDfZ, backpropLayer, backpropLastLayer) where
+module Layer (Layer (..), LayerTrainPack (..), Vec, Delta, evaluate, calcS, calcZ, mkLayer, calcDfZ, backpropLayer, backpropLastLayer, mkPrefLayer) where
 
 import Functions
 import  qualified Numeric.LinearAlgebra as N
@@ -75,3 +75,9 @@ mkLayer f1 l c = do
   w <- N.rand l c
   b <- N.rand l 1 >>= return . head . N.toColumns
   return $ Layer f1 w b
+
+mkPrefLayer :: Activation -> Int -> Int -> Layer
+mkPrefLayer f1 l c = Layer f1 w b
+  where
+    w = N.matrix l (replicate (l * c) 0) :: N.Matrix Double
+    b = N.vector (replicate l 0)
