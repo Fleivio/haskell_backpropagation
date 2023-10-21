@@ -1,85 +1,115 @@
-module Layer (Layer (..), LayerTrainPack (..), Vec, Delta, evaluate, calcS, calcZ, mkLayer, calcDfZ, backpropLayer, backpropLastLayer, mkPrefLayer) where
+module Layer (Layer (..), Vec, Delta, evaluate, mkLayer, backpropLayer, calcDfZ, backpropLastLayer, mkPrefLayer, completeShow) where
 
 import Functions
 import  qualified Numeric.LinearAlgebra as N
 import Debug.Trace
 
 type Vec = N.Vector Double
-
 type Delta = Vec
 
 data Layer = Layer
   { activation :: Activation,
     weights :: N.Matrix Double,
-    bias :: Vec
+    bias :: Vec,
+    input :: Vec,
+    output :: Vec,
+    delta :: Delta
   }
+
+completeShow :: Layer -> String
+completeShow l =
+  "\nInput: "
+    ++ show (N.cols $ weights l)
+    ++ "\nOutput "
+    ++ show (N.rows $ weights l)
+    ++ "\nWeights: "
+    ++ show (weights l)
+    ++ "\nBias: "
+    ++ show (bias l)
+    ++ "\n"
 
 instance Show Layer where
-  show (Layer _ w _) =
+  show l =
     "\nInput: "
-      ++ show (N.cols w)
+      ++ show (N.cols $ weights l)
       ++ "\nOutput "
-      ++ show (N.rows w)
+      ++ show (N.rows $ weights l)
       ++ "\n"
 
-evaluate :: Layer -> Vec -> Vec
-evaluate l = calcZ l . calcS l
+evaluate :: Layer -> Vec -> Layer
+evaluate l v = l {
+    input = v,
+    output = calcZ l $ calcS l v
+  }
 
 calcS :: Layer -> Vec -> Vec
-calcS (Layer _ w b) input = (w N.#> input) + b
+calcS l input = (weights l N.#> input) + bias l
 
 calcZ :: Layer -> Vec -> Vec
-calcZ (Layer f1 _ _) = N.fromList . f f1 . N.toList
+calcZ l = N.fromList . f (activation l) . N.toList
 
 calcDfZ :: Layer -> Vec -> Vec
-calcDfZ (Layer f1 _ _) = N.fromList . df f1 . N.toList
+calcDfZ l = N.fromList . df (activation l) . N.toList
 
-calcDelta :: Layer -> Layer -> Delta -> Vec -> Delta
-calcDelta layer nxtLayer nxtDelta actZ = (wt N.#> nxtDelta) * dfz
-  where
-    wt = N.tr $ weights nxtLayer
-    dfz = calcDfZ layer actZ
-
-data LayerTrainPack = LayerTrainPack
-  { nextLayer :: Layer,
-    nextDelta :: Delta,
-    z :: Vec,
-    prevZ :: Vec
+calcDelta :: Layer -> Layer -> Layer
+calcDelta l ln = --trace "calcDelta"
+  l {
+    delta = (wt N.#> nxtDelta) * dfz
   }
-  deriving (Show)
-
-backpropLayer :: Layer -> LayerTrainPack -> Double -> (Layer, Delta)
-backpropLayer layer a@(LayerTrainPack nxtLayer nxtDelta actZ prvZ) rate =
-  -- trace (show a)
-  ( layer
-      { weights = weights layer - N.scale rate wDeriv,
-        bias = bias layer - N.scale rate bDeriv
-      },
-    delta
-  )
   where
-    wDeriv = delta `N.outer` prvZ
-    bDeriv = delta
-    delta = calcDelta layer nxtLayer nxtDelta actZ
+    nxtDelta = delta ln
+    actZ = output l
+    wt = N.tr $ weights ln
+    dfz = calcDfZ l actZ
 
-backpropLastLayer :: Layer -> Delta -> Vec -> Double -> Layer
-backpropLastLayer layer delta prvZ rate =
-  layer
-    { weights = weights layer - N.scale rate wDeriv,
-      bias = bias layer - N.scale rate bDeriv
+backpropLayer :: Layer -> Layer -> Double -> Layer
+backpropLayer l' nxtLayer rate = -- trace "backpropLayer"
+  l {
+      weights = weights l - N.scale rate wDeriv,
+      bias = bias l - N.scale rate bDeriv
     }
   where
-    wDeriv = delta `N.outer` prvZ
-    bDeriv = delta
+    l = calcDelta l' nxtLayer
+    prvZ = input l
+    wDeriv = delta l `N.outer` prvZ
+    bDeriv = delta l
+
+backpropLastLayer :: Layer -> Vec -> Double -> Layer
+backpropLastLayer l' target rate = -- trace "backpropLastLayer"
+  l {
+      weights = weights l - N.scale rate wDeriv,
+      bias = bias l - N.scale rate bDeriv
+    }
+  where
+    l = l' {
+        delta = (output l' - target) * calcDfZ l' (output l')
+      }
+    wDeriv = delta l `N.outer` input l
+    bDeriv = delta l
+
+
+mkL :: Activation -> N.Matrix Double -> Vec -> Layer
+mkL f m v =
+  Layer {
+    activation = f,
+    weights = m,
+    bias = v,
+    input = N.vector (replicate c 1),
+    output = N.vector (replicate l 1),
+    delta = N.vector (replicate l 1)
+  }
+  where
+    l = N.rows m
+    c = N.cols m
 
 mkLayer :: Activation -> Int -> Int -> IO Layer
 mkLayer f1 l c = do
   w <- N.rand l c
   b <- N.rand l 1 >>= return . head . N.toColumns
-  return $ Layer f1 w b
+  return $ mkL f1 w b
 
 mkPrefLayer :: Activation -> Int -> Int -> Layer
-mkPrefLayer f1 l c = Layer f1 w b
+mkPrefLayer f1 l c = mkL f1 w b
   where
-    w = N.matrix l (replicate (l * c) 1) :: N.Matrix Double
+    w = N.matrix c (replicate (l * c) 1) :: N.Matrix Double
     b = N.vector (replicate l 1)

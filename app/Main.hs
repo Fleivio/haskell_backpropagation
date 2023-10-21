@@ -11,9 +11,10 @@ import System.Random.Shuffle
 irisNet :: IO Network
 irisNet = do
     l1 <- mkLayer sigmoid 5 4
-    l2 <- mkLayer sigmoid 3 5
-    l3 <- mkLayer softmax 3 3
-    return $ Network [l1, l2, l3] 0.001 crossEntropy
+    l2 <- mkLayer sigmoid 9 5
+    l3 <- mkLayer sigmoid 5 9
+    l4 <- mkLayer softmax 3 5
+    return $ Network [l1, l2, l3, l4] 0.001 crossEntropy
 
 runIris :: IO ()
 runIris = do
@@ -41,8 +42,8 @@ runIris = do
         err1 = test n2 testData
 
     let
-        trained = train n2 $ concat (replicate 100 trainData)
-        err2 = test trained testData
+        trained = train n2 $ concat (replicate 9999 trainData)
+        err2 = test trained trainData
 
     putStrLn $ "Erro1 : " ++ show err1
     putStrLn $ "Erro2 : " ++ show err2
@@ -51,18 +52,19 @@ runIris = do
 testNet :: Network
 testNet = Network [l1, l2] 0.1 crossEntropy
     where
-        l1 = mkPrefLayer sigmoid 2 2
+        l1 = mkPrefLayer sigmoid 2 3
         l2 = mkPrefLayer softmax 2 2
 
 runTest :: IO ()
 runTest = do
     let err1 = test testNet [(input, target)]
-        trained = train testNet $ replicate 4 (input, target)
+    print err1
+    let trained = train testNet $ replicate 10 (input, target)
         err2 = test trained [(input, target)]
     print err2
     where
-        input = N.vector [1, 9]
-        target = N.vector [0, 1]
+        input = N.vector [1, 9, 3]
+        target = N.vector [0, 0.4]
 
 main :: IO ()
 main = do

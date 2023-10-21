@@ -1,6 +1,9 @@
-module Network (Network (..), forward, forwardLog, backprop, train, test, testShow) where
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use tuple-section" #-}
+{-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+module Network (Network (..), forward, getOutput, train, test, calcErrN) where
 
-import GHC.OldList (zip4)
 import Layer
 import Functions
 import qualified Numeric.LinearAlgebra as N
@@ -15,37 +18,69 @@ data Network = Network
 instance Show Network where
   show net = show (layers net)
 
-calcErr :: Network -> Vec -> Vec -> Double
-calcErr net output target = errF net (N.toList output) (N.toList target)
+instance Semigroup Network where
+  net1 <> net2 = net1 {layers = layers net1 ++ layers net2}
 
-forward :: Network -> Vec -> Vec
+getOutput :: Network -> Vec
+getOutput net = output $ last $ layers net
+
+forward :: Network -> Vec -> Network
 forward net input =
   case layers net of
-    [] -> input
-    (l : ls) -> forward net {layers = ls} $ evaluate l input
+    [] -> net
+    (l : ls) -> net { layers = [newLayer] } <> nextLayers
+      where
+        newLayer = evaluate l input
+        nextLayers = -- trace "a" $
+          forward net {layers = ls} (output newLayer)
 
-logGetOutput :: [Vec] -> Vec
-logGetOutput = last
+calcErr :: Network -> Vec -> Vec -> Double
+calcErr net out trg = errF net (N.toList out) (N.toList trg)
 
-forwardLog :: Network -> Vec -> [Vec]
-forwardLog net input =
-  case layers net of
-    [] -> [input]
-    (l : ls) -> input : forwardLog net {layers = ls} (evaluate l input)
+calcErrN :: Network -> [(Vec, Vec)] -> Double
+calcErrN net datas = sum (map error1 datas) / fromIntegral (length datas)
+  where
+    error1 = uncurry $ calcErr net
 
 test :: Network -> [(Vec, Vec)] -> Double
-test net datas = sum (map error1 datas) / fromIntegral (length datas)
+test net datas =
+  sum (map error1 datas) / fromIntegral (length datas)
   where
-    error1 (input, target) 
-      = let output = forward net input
-        in calcErr net output target
+    error1 (input, target)
+      = let output = getOutput $ forward net input
+        in --trace (show output) $
+           calcErr net output target
 
-testShow :: Network -> [(Vec, Vec)] -> IO ()
-testShow net datas = do
-  let error1 (input, target) 
-        = let output = forward net input
-          in calcErr net output target
-  mapM_ (putStrLn . show . error1) datas
+train :: Network -> [(Vec, Vec)] -> Network
+train net [] = net
+train net ((input, target) : xs) = train (backprop net input target) xs
+
+backprop :: Network -> Vec -> Vec -> Network
+backprop net' input target =
+  net {
+    layers = newLayers
+  }
+  where
+    net = forward net' input
+
+    layerOut = backpropLastLayer
+      (last $ layers net)
+      target
+      (learningRate net)
+
+    revLayers = reverse $ init (layers net) ++ [layerOut]
+    newLayers = reverse $ layerOut : backprop' revLayers
+
+    backprop' :: [Layer] -> [Layer]
+    backprop' (ln:la:ls) =
+      let
+        lnew = backpropLayer la ln (learningRate net)
+      in lnew : backprop' (la:ls)
+    backprop' [_] = []
+    backprop' [] = []
+
+
+{--
 
 train :: Network -> [(Vec, Vec)] -> Network
 train net [] = net
@@ -84,3 +119,4 @@ backprop net input target =
         (actZ, pz, l, nl) = last ltps
         tp = LayerTrainPack nl nxtDelta actZ pz
         (al, delta) = backpropLayer l tp (learningRate net)
+--}

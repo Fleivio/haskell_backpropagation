@@ -10,16 +10,20 @@ type ErrorFunction = [Double] -> [Double] -> Double
 sigmoid :: Activation
 sigmoid =
   Act
-    { f = fmap (\x -> 1 / (1 + exp (negate x))),
-      df = fmap (\x -> x * (1 - x))
+    { f = fmap sig,
+      df = fmap (\x -> sig x * (1 - sig x))
     }
+    where
+      sig x = 1 / (1 + exp (negate x))
 
 softmax :: Activation
 softmax =
   Act
-    { f = \xs -> fmap (/sum xs) xs,
+    { f = \xs -> fmap (`soft` xs) xs,
       df = ([1 :: Double] <*)
     }
+  where
+    soft x xs = exp x / sum (map exp xs)
 
 id_ :: Activation
 id_ =
