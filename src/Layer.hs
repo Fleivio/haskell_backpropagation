@@ -62,30 +62,24 @@ calcDelta l ln =
     wt = N.tr $ weights ln
     dfz = calcDfZ l actZ
 
-backpropLayer :: Layer -> Layer -> Double -> Layer
-backpropLayer l' nxtLayer rate =
+scaleLayer :: Layer -> Double -> Layer
+scaleLayer l rate = 
   l {
-      weights = weights l - N.scale rate wDeriv,
-      bias = bias l - N.scale rate bDeriv
+    weights = weights l - N.scale rate wD,
+    bias = bias l - N.scale rate bD
   }
   where
-    l = calcDelta l' nxtLayer
-    prvZ = input l
-    wDeriv = delta l `N.outer` prvZ
-    bDeriv = delta l
+    wD = delta l `N.outer` input l
+    bD = delta l
+
+backpropLayer :: Layer -> Layer -> Double -> Layer
+backpropLayer l nxtLayer = scaleLayer (calcDelta l nxtLayer)
 
 backpropLastLayer :: Layer  -> Vec -> Double -> Layer
-backpropLastLayer l' trg rate =
-  l {
-      weights = weights l - N.scale rate wDeriv,
-      bias = bias l - N.scale rate bDeriv
-  }
-  where
-    l = l' {
-        delta = (output l' - trg) * calcDfZ l' (output l')
-      }
-    wDeriv = delta l `N.outer` input l
-    bDeriv = delta l
+backpropLastLayer l trg = 
+  scaleLayer l {
+                delta = (output l - trg) * calcDfZ l (output l)
+              }
 
 
 mkL :: Activation -> N.Matrix Double -> Vec -> Layer
@@ -115,4 +109,4 @@ mkPrefLayer f1 l c = mkL f1 w b
   where
     w = N.matrix c (take (l * c) staff) :: N.Matrix Double
     b = N.vector (take l staff)
-    staff = concat $ replicate 100 [-1,0.5,1]
+    staff = cycle [-1,0.5,1]
